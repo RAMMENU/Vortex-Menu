@@ -1,47 +1,118 @@
--- Machos Menu for MachoCheats
-local playerPed = GetPlayerPed(-1)
-local menuActive = false
-local function Wait(ms)
-    local start = GetGameTimer()
-    while GetGameTimer() - start < ms do end
+local freeCamActive = false
+local cam = nil
+local camSpeed = 0.5
+local toggleKey = 74 -- H key
+
+-- Convert rotation to direction vector
+local function RotationToDirection(rot)
+    local z = math.rad(rot.z)
+    local x = math.rad(rot.x)
+    local num = math.abs(math.cos(x))
+    return vector3(-math.sin(z) * num, math.cos(z) * num, math.sin(x))
 end
-local KEY_F6 = 167
-local KEY_F7 = 168
-local KEY_F8 = 169
-local KEY_F9 = 170
-function ToggleMenu()
-    menuActive = not menuActive
-    print("Machos Menu: " .. (menuActive and "Opened (F7: Teleport, F8: Spawn Adder, F9: God Mode)" or "Closed"))
+
+-- Raycast from cam to get hit position
+local function GetCamHitCoord()
+    local camCoords = GetCamCoord(cam)
+    local camRot = GetCamRot(cam, 2)
+    local direction = RotationToDirection(camRot)
+    local target = camCoords + direction * 1000.0
+
+    local ray = StartShapeTestRay(camCoords.x, camCoords.y, camCoords.z, target.x, target.y, target.z, 1, -1, 0)
+    local _, hit, hitCoords = GetShapeTestResult(ray)
+
+    if hit == 1 then
+        return hitCoords
+    else
+        return nil
+    end
 end
-function Teleport()
-    SetEntityCoords(playerPed, -1037.0, -2737.0, 13.8, false, false, false, true)
-    print("Machos Menu: Teleported to Airport!")
+
+-- Teleport player to the hit location
+local function TeleportPedToCoord(coord)
+    local ped = PlayerPedId()
+    local success, groundZ = GetGroundZFor_3dCoord(coord.x, coord.y, coord.z + 10.0, 0)
+    local finalZ = success and (groundZ + 1.0) or (coord.z + 1.0)
+    SetEntityCoords(ped, coord.x, coord.y, finalZ, false, false, false, true)
 end
-function SpawnVehicle()
-    local model = GetHashKey("adder")
-    RequestModel(model)
-    while not HasModelLoaded(model) do Wait(100) end
-    local coords = GetEntityCoords(playerPed)
-    local vehicle = CreateVehicle(model, coords[1], coords[2], coords[3], GetEntityHeading(playerPed), true, false)
-    SetPedIntoVehicle(playerPed, vehicle, -1)
-    print("Machos Menu: Spawned Adder!")
+
+-- Enable/disable free cam
+local function ToggleFreeCam()
+    freeCamActive = not freeCamActive
+    local ped = PlayerPedId()
+
+    if freeCamActive then
+        local coords = GetEntityCoords(ped)
+
+        cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
+        SetCamCoord(cam, coords.x, coords.y, coords.z + 1.0)
+        SetCamRot(cam, 0.0, 0.0, GetEntityHeading(ped))
+        RenderScriptCams(true, true, 0, true, true)
+
+        FreezeEntityPosition(ped, true)
+        SetEntityCollision(ped, false, false)
+    else
+        RenderScriptCams(false, true, 0, true, true)
+        DestroyCam(cam, false)
+        cam = nil
+
+        FreezeEntityPosition(ped, false)
+        SetEntityCollision(ped, true, true)
+    end
 end
-function ToggleGodMode()
-    local isInvincible = GetEntityInvincible(playerPed)
-    SetEntityInvincible(playerPed, not isInvincible)
-    print("Machos Menu: God Mode " .. (not isInvincible and "On" or "Off"))
-end
-while true do
-    if IsControlJustPressed(0, KEY_F6) then
-        ToggleMenu()
-    elseif menuActive then
-        if IsControlJustPressed(0, KEY_F7) then
-            Teleport()
-        elseif IsControlJustPressed(0, KEY_F8) then
-            SpawnVehicle()
-        elseif IsControlJustPressed(0, KEY_F9) then
-            ToggleGodMode()
+
+-- Bind H to toggle free cam
+CreateThread(function()
+    while true do
+        Wait(0)
+        if IsControlJustPressed(0, toggleKey) then
+            ToggleFreeCam()
         end
     end
-    Wait(0)
-end
+end)
+
+-- Main Free Cam loop with teleport & exit
+CreateThread(function()
+    while true do
+        Wait(0)
+        if freeCamActive and cam then
+            DisableAllControlActions(0)
+
+            local x, y, z = table.unpack(GetCamCoord(cam))
+            local rotX, rotY, rotZ = table.unpack(GetCamRot(cam, 2))
+            local forward = GetCamForwardVector(cam)
+            local right = vector3(-forward.y, forward.x, 0.0)
+
+            -- Movement
+            if IsDisabledControlPressed(0, 32) then x = x + forward.x * camSpeed y = y + forward.y * camSpeed z = z + forward.z * camSpeed end
+            if IsDisabledControlPressed(0, 33) then x = x - forward.x * camSpeed y = y - forward.y * camSpeed z = z - forward.z * camSpeed end
+if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
+            if IsDisabledControlPressed(0, 35) then x = x + right.x * camSpeed y = y + right.y * camSpeed end
+            if IsDisabledControlPressed(0, 44) then z = z + camSpeed end
+            if IsDisabledControlPressed(0, 36) then z = z - camSpeed end
+
+            -- Mouse look
+            local rightAxisX = GetDisabledControlNormal(0, 220)
+            local rightAxisY = GetDisabledControlNormal(0, 221)
+            rotZ = rotZ + rightAxisX * -5.0
+            rotX = rotX + rightAxisY * -5.0
+            if rotX > 89.0 then rotX = 89.0 end
+            if rotX < -89.0 then rotX = -89.0 end
+
+            SetCamCoord(cam, x, y, z)
+            SetCamRot(cam, rotX, rotY, rotZ, 2)
+
+            -- Audio remains at ped
+            SetAudioListenerEntity(PlayerPedId())
+
+            -- Teleport on left click
+            if IsDisabledControlJustPressed(0, 24) then
+                local coord = GetCamHitCoord()
+                if coord then
+                    TeleportPedToCoord(coord)
+                    ToggleFreeCam() -- Auto-exit free cam
+                end
+            end
+        end
+    end
+end)
