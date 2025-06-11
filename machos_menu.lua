@@ -23,17 +23,13 @@ function drawRect(x, y, width, height, r, g, b, a)
     DrawRect(x, y, width, height, r, g, b, a) -- Assume Macho provides this
 end
 
-function isKeyPressed(key)
-    return IsKeyPressed(key) -- Assume Macho provides key input
-end
-
 function isMouseInBounds(x, y, w, h)
     local mx, my = GetMousePosition() -- Assume Macho provides mouse position
     return mx >= x and mx <= x + w and my >= y and my <= y + h
 end
 
 function isMouseClicked()
-    return IsMouseClicked() -- Assume Macho provides mouse click detection
+    return IsControlJustPressed(0, 24) -- Mouse left click (GTA V native)
 end
 
 function toggleOption(label, x, y, state)
@@ -48,8 +44,8 @@ function sliderOption(label, x, y, value, min, max)
     drawText(label, x, y, 0.3, 255, 255, 255, 255)
     drawRect(x + 0.1, y, 0.08, 0.02, 255, 255, 0, 200)
     local newValue = value
-    if isMouseInBounds(x + 0.1, y - 0.01, 0.08, 0.02) and isMouseClicked() then
-        local mx = GetMousePosition()
+    if isMouseInBounds(x + 0.1, y - 0.01, 0.08, 0.02) and IsControlPressed(0, 24) then
+        local mx = GetMousePosition() / 1920 -- Normalize mouse x
         newValue = (mx - (x + 0.1)) / 0.08 * (max - min)
         newValue = math.max(min, math.min(max, newValue))
     end
@@ -93,7 +89,7 @@ end
 
 -- Main loop
 while true do
-    if isKeyPressed(116) then -- F5 key (VK_F5)
+    if IsControlJustPressed(0, 166) then -- F5 key (VK_F5)
         menuOpen = not menuOpen
         Wait(200) -- Debounce
     end
