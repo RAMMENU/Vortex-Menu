@@ -46,7 +46,7 @@ local function GetCamHitCoord()
     local camRot = GetCamRot(cam, 2)
     local direction = RotationToDirection(camRot)
     local target = camCoords + direction * 1000.0
-    local ray = StartShapeTestRay(camCoords.x, camCoords.y, camCoords.z, target.x, target.y, target.z, 1, -1, 0)
+    local ray = StartShapeTestRay(camCoords.x, camCoords.y, camCoords.z, target.x, target.y, target.z, -1, PlayerPedId(), 0)
     local _, hit, hitCoords = GetShapeTestResult(ray)
     return (hit == 1) and hitCoords or nil
 end
@@ -56,12 +56,16 @@ local function TeleportPedToCoord(coord)
     local success, groundZ = GetGroundZFor_3dCoord(coord.x, coord.y, coord.z + 10.0, 0)
     local finalZ = success and (groundZ + 1.0) or (coord.z + 1.0)
     SetEntityCoords(ped, coord.x, coord.y, finalZ, false, false, false, true)
+    SetEntityHeading(ped, GetCamRot(cam, 2).z)
 end
 
 -- Toggle functions
 local function ToggleGodmode(state)
     local ped = PlayerPedId()
     SetEntityInvincible(ped, state)
+    if state then
+        SetEntityHealth(ped, GetEntityMaxHealth(ped))
+    end
 end
 
 local function ToggleInvisibility(state)
@@ -103,28 +107,42 @@ local function ToggleNoClip(state)
     local ped = PlayerPedId()
     SetEntityCollision(ped, not state, not state)
     SetEntityAlpha(ped, state and 150 or 255, false)
+    if state then
+        SetEntityInvincible(ped, true)
+    end
 end
 
 local function TogglePunch(state)
     local ped = PlayerPedId()
-    SetPedCombatMovement(ped, state and 2 or 0)
+    if state then
+        SetPedCombatAbility(ped, 2)
+        SetPedCombatRange(ped, 2)
+    else
+        SetPedCombatAbility(ped, 0)
+        SetPedCombatRange(ped, 0)
+    end
 end
 
 local function ToggleStrength(state)
     local ped = PlayerPedId()
-    SetPedStrength(ped, state and 1.0 or 0.5)
+    SetPedMoveRateOverride(ped, state and 1.1 or 1.0)
 end
 
 local function ToggleThrow(state)
-    -- Simplified throw logic (needs vehicle check)
     if state and IsPedInAnyVehicle(PlayerPedId(), false) then
         local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
-        TaskLeaveVehicle(PlayerPedId(), vehicle, 0)
+        for seat = -1, GetVehicleMaxNumberOfPassengers(vehicle) - 1 do
+            local ped = GetPedInVehicleSeat(vehicle, seat)
+            if ped ~= 0 and ped ~= PlayerPedId() then
+                TaskLeaveVehicle(ped, vehicle, 64)
+            end
+        end
     end
 end
 
 local function ToggleFriendlyFire(state)
     NetworkSetFriendlyFireOption(state)
+    TriggerEvent("chat:addMessage", { args = {"Friendly Fire: " .. (state and "ON" or "OFF")} })
 end
 
 local function ToggleCrosshair(state)
@@ -144,42 +162,49 @@ end
 
 local function ChangeModel(value)
     local ped = PlayerPedId()
-    RequestModel(value)
-    while not HasModelLoaded(value) do Wait(0) end
-    SetPlayerModel(PlayerId(), value)
-    SetModelAsNoLongerNeeded(value)
+    local model = GetHashKey(value)
+    RequestModel(model)
+    while not HasModelLoaded(model) do Wait(0) end
+    SetPlayerModel(PlayerId(), model)
+    SetModelAsNoLongerNeeded(model)
 end
 
 local function Heal()
     local ped = PlayerPedId()
     SetEntityHealth(ped, GetEntityMaxHealth(ped))
+    TriggerEvent("chat:addMessage", { args = {"Healed"} })
 end
 
 local function Armor()
     local ped = PlayerPedId()
     SetPedArmour(ped, 100)
+    TriggerEvent("chat:addMessage", { args = {"Armor set to 100"} })
 end
 
 local function Revive()
     local ped = PlayerPedId()
-    ResurrectPed(ped)
+    NetworkResurrectLocalPlayer(GetEntityCoords(ped), GetEntityHeading(ped), true, false)
     SetEntityHealth(ped, GetEntityMaxHealth(ped))
+    TriggerEvent("chat:addMessage", { args = {"Revived"} })
 end
 
 local function Suicide()
     local ped = PlayerPedId()
     SetEntityHealth(ped, 0)
+    TriggerEvent("chat:addMessage", { args = {"Committed suicide"} })
 end
 
 local function ClearTask()
     local ped = PlayerPedId()
     ClearPedTasksImmediately(ped)
+    TriggerEvent("chat:addMessage", { args = {"Tasks cleared"} })
 end
 
 local function ResetVision()
     local ped = PlayerPedId()
     ResetPedVisibleDamage(ped)
     ClearPedBloodDamage(ped)
+    TriggerEvent("chat:addMessage", { args = {"Vision reset"} })
 end
 
 -- Action mapping
@@ -346,5 +371,13 @@ CreateThread(function()
                 end
             end
         end
+    end
+end)
+
+-- FiveM-specific cleanup on resource stop
+AddEventHandler("onResourceStop", function(resourceName)
+    if GetCurrentResourceName() == resourceName then
+        if freeCamActive then ToggleFreeCam(false) end
+        menuActive = false
     end
 end)
