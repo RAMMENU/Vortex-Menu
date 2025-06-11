@@ -1,29 +1,27 @@
+--[[
+  FULL FREE CAMERA LUA MENU SCRIPT UPDATED TO MATCH THE TOGGLE UI STYLE SEEN IN "FREAKO"
+--]]
+
 local freeCamActive = false
 local cam = nil
 local camSpeed = 0.5
 local teleportEnabled = true
 local menuActive = false
-local currentSection = 1
 local currentOption = 1
-local inSubmenu = false
 
--- Menu structure with sections
-local menuOptions = {
-    {
-        label = "Free Cam Controls",
-        options = {
-            { label = "Toggle Free Cam (OFF)", action = "toggle_free_cam" },
-            { label = "Camera Speed: 0.5", action = "adjust_speed", value = 0.5 },
-            { label = "Teleport on Click: ON", action = "toggle_teleport" }
-        }
-    },
-    {
-        label = "Actions",
-        options = {
-            { label = "Trigger Explosion", action = "explode" }
-        }
-    }
-    -- Add more sections here, e.g., { label = "New Section", options = { ... } }
+-- Player Option Toggles
+local playerOptions = {
+    { label = "Godmode", action = "toggle_godmode", state = false },
+    { label = "Invisibility", action = "toggle_invis", state = false },
+    { label = "No Ragdoll", action = "toggle_noragdoll", state = false },
+    { label = "Infinite Stamina", action = "toggle_stamina", state = false },
+    { label = "Free Camera", action = "toggle_free_cam", state = false },
+    { label = "No Clip", action = "toggle_noclip", state = false },
+    { label = "Super Punch", action = "toggle_punch", state = false },
+    { label = "Super Strength", action = "toggle_strength", state = false },
+    { label = "Throw People From Vehicle", action = "toggle_throw", state = false },
+    { label = "Friendly Fire", action = "toggle_friendly", state = false },
+    { label = "Crosshair", action = "toggle_crosshair", state = false }
 }
 
 -- Convert rotation to direction vector
@@ -40,15 +38,9 @@ local function GetCamHitCoord()
     local camRot = GetCamRot(cam, 2)
     local direction = RotationToDirection(camRot)
     local target = camCoords + direction * 1000.0
-
     local ray = StartShapeTestRay(camCoords.x, camCoords.y, camCoords.z, target.x, target.y, target.z, 1, -1, 0)
     local _, hit, hitCoords = GetShapeTestResult(ray)
-
-    if hit == 1 then
-        return hitCoords
-    else
-        return nil
-    end
+    return (hit == 1) and hitCoords or nil
 end
 
 -- Teleport player to the hit location
@@ -59,18 +51,10 @@ local function TeleportPedToCoord(coord)
     SetEntityCoords(ped, coord.x, coord.y, finalZ, false, false, false, true)
 end
 
--- Trigger explosion at coord
-local function TriggerExplosion(coord)
-    if coord then
-        AddExplosion(coord.x, coord.y, coord.z, 2, 100.0, true, false, 1.0) -- Explosion type 2 (grenade)
-    end
-end
-
 -- Enable/disable free cam
-local function ToggleFreeCam()
+function ToggleFreeCam()
     freeCamActive = not freeCamActive
     local ped = PlayerPedId()
-
     if freeCamActive then
         local coords = GetEntityCoords(ped)
         cam = CreateCam("DEFAULT_SCRIPTED_CAMERA", true)
@@ -79,7 +63,6 @@ local function ToggleFreeCam()
         RenderScriptCams(true, true, 0, true, true)
         FreezeEntityPosition(ped, true)
         SetEntityCollision(ped, false, false)
-        SetMouseCursorActiveThisFrame() -- Enable mouse cursor
     else
         RenderScriptCams(false, true, 0, true, true)
         DestroyCam(cam, false)
@@ -87,62 +70,44 @@ local function ToggleFreeCam()
         FreezeEntityPosition(ped, false)
         SetEntityCollision(ped, true, true)
     end
-    menuOptions[1].options[1].label = "Toggle Free Cam (" .. (freeCamActive and "ON" or "OFF") .. ")"
 end
 
 -- Draw text on screen
-local function DrawText2D(x, y, text, scale, r, g, b, a)
-    SetTextFont(4) -- Modern font
+function DrawText2D(x, y, text, scale, r, g, b, a)
+    SetTextFont(4)
     SetTextProportional(1)
     SetTextScale(scale, scale)
     SetTextColour(r, g, b, a)
-    SetTextDropShadow(0, 0, 0, 0, 255)
-    SetTextEdge(2, 0, 0, 0, 150)
     SetTextDropShadow()
+    SetTextEdge(2, 0, 0, 0, 150)
     SetTextOutline()
     BeginTextCommandDisplayText("STRING")
     AddTextComponentSubstringPlayerName(text)
     EndTextCommandDisplayText(x, y)
 end
 
--- Draw fancy menu
-local function DrawMenu()
-    -- Gradient background
-    DrawRect(0.15, 0.35, 0.25, 0.5, 0, 0, 0, 220) -- Base
-    DrawRect(0.15, 0.35, 0.25, 0.5, 0, 150, 255, 100) -- Gradient overlay
-    DrawRect(0.15, 0.15, 0.25, 0.05, 0, 100, 200, 255) -- Title bar
-    DrawText2D(0.08, 0.14, "~b~VORTEX MENU", 0.5, 255, 255, 255, 255)
+-- Draw menu with toggles
+function DrawMenu()
+    DrawRect(0.15, 0.4, 0.3, 0.6, 0, 0, 0, 220)
+    DrawRect(0.15, 0.15, 0.3, 0.05, 255, 200, 0, 255)
+    DrawText2D(0.08, 0.14, "~y~Freako - Player Options", 0.5, 255, 255, 255, 255)
 
     local y = 0.2
-    if not inSubmenu then
-        -- Display sections
-        for i, section in ipairs(menuOptions) do
-            local color = (i == currentSection) and { 255, 255, 0, 255 } or { 200, 200, 200, 255 }
-            local prefix = (i == currentSection) and "~y~> " or "  "
-            DrawText2D(0.08, y, prefix .. section.label, 0.4, color[1], color[2], color[3], color[4])
-            y = y + 0.05
-        end
-    else
-        -- Display options in current section
-        local section = menuOptions[currentSection]
-        DrawText2D(0.08, y, "~b~" .. section.label, 0.45, 255, 255, 255, 255)
-        y = y + 0.05
-        for i, option in ipairs(section.options) do
-            local color = (i == currentOption) and { 255, 255, 0, 255 } or { 200, 200, 200, 255 }
-            local prefix = (i == currentOption) and "~y~> " or "  "
-            DrawText2D(0.08, y, prefix .. option.label, 0.4, color[1], color[2], color[3], color[4])
-            y = y + 0.05
-        end
+    for i, option in ipairs(playerOptions) do
+        local color = (i == currentOption) and { 255, 255, 0, 255 } or { 200, 200, 200, 255 }
+        local toggle = option.state and "~g~ON" or "~r~OFF"
+        local labelText = string.format("%s [%s]", option.label, toggle)
+        DrawText2D(0.08, y, labelText, 0.4, color[1], color[2], color[3], color[4])
+        y = y + 0.045
     end
 end
 
--- Menu input handling
+-- Main menu loop
 CreateThread(function()
     while true do
         Wait(0)
-        if IsControlJustPressed(0, 166) then -- F5 to toggle menu
+        if IsControlJustPressed(0, 166) then -- F5
             menuActive = not menuActive
-            if not menuActive then inSubmenu = false end -- Reset submenu on close
         end
 
         if menuActive then
@@ -151,60 +116,25 @@ CreateThread(function()
             EnableControlAction(0, 172, true) -- Up
             EnableControlAction(0, 173, true) -- Down
             EnableControlAction(0, 176, true) -- Enter
-            EnableControlAction(0, 175, true) -- Right (enter submenu)
-            EnableControlAction(0, 174, true) -- Left (exit submenu)
-            EnableControlAction(0, 166, true) -- F5
 
-            if not inSubmenu then
-                -- Navigate sections
-                if IsControlJustPressed(0, 172) then -- Up
-                    currentSection = currentSection - 1
-                    if currentSection < 1 then currentSection = #menuOptions end
-                elseif IsControlJustPressed(0, 173) then -- Down
-                    currentSection = currentSection + 1
-                    if currentSection > #menuOptions then currentSection = 1 end
-               率先
-                elseif IsControlJustPressed(0, 175) then -- Right (enter submenu)
-                    if #menuOptions[currentSection].options > 0 then
-                        inSubmenu = true
-                        currentOption = 1
-                    end
-                end
-            else
-                -- Navigate options
-                if IsControlJustPressed(0, 172) then -- Up
-                    currentOption = currentOption - 1
-                    if currentOption < 1 then currentOption = #menuOptions[currentSection].options end
-                elseif IsControlJustPressed(0, 173) then -- Down
-                    currentOption = currentOption + 1
-                    if currentOption > #menuOptions[currentSection].options then currentOption = 1 end
-                elseif IsControlJustPressed(0, 176) then -- Enter
-                    local option = menuOptions[currentSection].options[currentOption]
-                    if option.action == "toggle_free_cam" then
-                        ToggleFreeCam()
-                    elseif option.action == "adjust_speed" then
-                        camSpeed = camSpeed + 0.1
-                        if camSpeed > 2.0 then camSpeed = 0.1 end
-                        option.value = camSpeed
-                        option.label = string.format("Camera Speed: %.1f", camSpeed)
-                    elseif option.action == "toggle_teleport" then
-                        teleportEnabled = not teleportEnabled
-                        option.label = "Teleport on Click: " .. (teleportEnabled and "ON" or "OFF")
-                    elseif option.action == "explode" then
-                        local coord = GetCamHitCoord()
-                        if coord then
-                            TriggerExplosion(coord)
-                        end
-                    end
-                elseif IsControlJustPressed(0, 174) then -- Left (exit submenu)
-                    inSubmenu = false
+            if IsControlJustPressed(0, 172) then
+                currentOption = currentOption - 1
+                if currentOption < 1 then currentOption = #playerOptions end
+            elseif IsControlJustPressed(0, 173) then
+                currentOption = currentOption + 1
+                if currentOption > #playerOptions then currentOption = 1 end
+            elseif IsControlJustPressed(0, 176) then
+                local opt = playerOptions[currentOption]
+                opt.state = not opt.state
+                if opt.action == "toggle_free_cam" then
+                    ToggleFreeCam()
                 end
             end
         end
     end
 end)
 
--- Main Free Cam loop with teleport, explosion, and scroll wheel
+-- Free Cam Controls
 CreateThread(function()
     while true do
         Wait(0)
@@ -215,14 +145,12 @@ CreateThread(function()
             EnableControlAction(0, 15, true) -- Scroll down
             EnableControlAction(0, 220, true) -- Mouse X
             EnableControlAction(0, 221, true) -- Mouse Y
-            SetMouseCursorActiveThisFrame() -- Ensure mouse is active
 
             local x, y, z = table.unpack(GetCamCoord(cam))
             local rotX, rotY, rotZ = table.unpack(GetCamRot(cam, 2))
             local forward = GetCamForwardVector(cam)
             local right = vector3(-forward.y, forward.x, 0.0)
 
-            -- Movement
             if IsDisabledControlPressed(0, 32) then x = x + forward.x * camSpeed y = y + forward.y * camSpeed z = z + forward.z * camSpeed end
             if IsDisabledControlPressed(0, 33) then x = x - forward.x * camSpeed y = y - forward.y * camSpeed z = z - forward.z * camSpeed end
             if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
@@ -230,7 +158,6 @@ CreateThread(function()
             if IsDisabledControlPressed(0, 44) then z = z + camSpeed end
             if IsDisabledControlPressed(0, 36) then z = z - camSpeed end
 
-            -- Mouse look
             local rightAxisX = GetDisabledControlNormal(0, 220)
             local rightAxisY = GetDisabledControlNormal(0, 221)
             rotZ = rotZ + rightAxisX * -5.0
@@ -238,31 +165,21 @@ CreateThread(function()
             if rotX > 89.0 then rotX = 89.0 end
             if rotX < -89.0 then rotX = -89.0 end
 
-            -- Scroll wheel for speed adjustment
-            if IsDisabledControlJustPressed(0, 14) then -- Scroll up
-                camSpeed = camSpeed + 0.1
-                if camSpeed > 2.0 then camSpeed = 2.0 end
-                menuOptions[1].options[2].value = camSpeed
-                menuOptions[1].options[2].label = string.format("Camera Speed: %.1f", camSpeed)
-            elseif IsDisabledControlJustPressed(0, 15) then -- Scroll down
-                camSpeed = camSpeed - 0.1
-                if camSpeed < 0.1 then camSpeed = 0.1 end
-                menuOptions[1].options[2].value = camSpeed
-                menuOptions[1].options[2].label = string.format("Camera Speed: %.1f", camSpeed)
+            if IsDisabledControlJustPressed(0, 14) then
+                camSpeed = math.min(camSpeed + 0.1, 2.0)
+            elseif IsDisabledControlJustPressed(0, 15) then
+                camSpeed = math.max(camSpeed - 0.1, 0.1)
             end
 
             SetCamCoord(cam, x, y, z)
             SetCamRot(cam, rotX, rotY, rotZ, 2)
-
-            -- Audio remains at ped
             SetAudioListenerEntity(PlayerPedId())
 
-            -- Teleport on left click (if enabled)
             if teleportEnabled and IsDisabledControlJustPressed(0, 24) then
                 local coord = GetCamHitCoord()
                 if coord then
                     TeleportPedToCoord(coord)
-                    ToggleFreeCam() -- Auto-exit free cam
+                    ToggleFreeCam()
                 end
             end
         end
