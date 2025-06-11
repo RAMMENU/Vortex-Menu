@@ -198,7 +198,7 @@ end
 CreateThread(function()
     while true do
         Wait(0)
-        if IsControlJustPressed(0, 166) then -- F5
+        if IsControlJustPressed(0, 121) then -- Caps Lock
             menuActive = not menuActive
             if menuActive then currentOption = 1 end
         end
