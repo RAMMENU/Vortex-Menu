@@ -16,7 +16,6 @@ local playerOptions = {
     { label = "Super Punch", action = "toggle_punch", state = false },
     { label = "Super Strength", action = "toggle_strength", state = false },
     { label = "Throw People From Vehicle", action = "toggle_throw", state = false },
-    { label = "Friendly Fire", action = "toggle_friendly", state = false },
     { label = "Crosshair", action = "toggle_crosshair", state = false }
 }
 
@@ -27,7 +26,6 @@ local miscOptions = {
     { label = "Change Model", action = "change_model", value = "a_m_m_hillbilly_01" },
     { label = "Heal", action = "heal", value = nil },
     { label = "Armor", action = "armor", value = nil },
-    { label = "Revive", action = "revive", value = nil },
     { label = "Suicide", action = "suicide", value = nil },
     { label = "Clear Task", action = "clear_task", value = nil },
     { label = "Reset Vision", action = "reset_vision", value = nil }
@@ -63,9 +61,7 @@ end
 local function ToggleGodmode(state)
     local ped = PlayerPedId()
     SetEntityInvincible(ped, state)
-    if state then
-        SetEntityHealth(ped, GetEntityMaxHealth(ped))
-    end
+    if state then SetEntityHealth(ped, GetEntityMaxHealth(ped)) end
 end
 
 local function ToggleInvisibility(state)
@@ -107,9 +103,6 @@ local function ToggleNoClip(state)
     local ped = PlayerPedId()
     SetEntityCollision(ped, not state, not state)
     SetEntityAlpha(ped, state and 150 or 255, false)
-    if state then
-        SetEntityInvincible(ped, true)
-    end
 end
 
 local function TogglePunch(state)
@@ -134,15 +127,10 @@ local function ToggleThrow(state)
         for seat = -1, GetVehicleMaxNumberOfPassengers(vehicle) - 1 do
             local ped = GetPedInVehicleSeat(vehicle, seat)
             if ped ~= 0 and ped ~= PlayerPedId() then
-                TaskLeaveVehicle(ped, vehicle, 64)
+                TaskLeaveVehicle(ped, vehicle, 0)
             end
         end
     end
-end
-
-local function ToggleFriendlyFire(state)
-    NetworkSetFriendlyFireOption(state)
-    TriggerEvent("chat:addMessage", { args = {"Friendly Fire: " .. (state and "ON" or "OFF")} })
 end
 
 local function ToggleCrosshair(state)
@@ -172,39 +160,27 @@ end
 local function Heal()
     local ped = PlayerPedId()
     SetEntityHealth(ped, GetEntityMaxHealth(ped))
-    TriggerEvent("chat:addMessage", { args = {"Healed"} })
 end
 
 local function Armor()
     local ped = PlayerPedId()
     SetPedArmour(ped, 100)
-    TriggerEvent("chat:addMessage", { args = {"Armor set to 100"} })
-end
-
-local function Revive()
-    local ped = PlayerPedId()
-    NetworkResurrectLocalPlayer(GetEntityCoords(ped), GetEntityHeading(ped), true, false)
-    SetEntityHealth(ped, GetEntityMaxHealth(ped))
-    TriggerEvent("chat:addMessage", { args = {"Revived"} })
 end
 
 local function Suicide()
     local ped = PlayerPedId()
     SetEntityHealth(ped, 0)
-    TriggerEvent("chat:addMessage", { args = {"Committed suicide"} })
 end
 
 local function ClearTask()
     local ped = PlayerPedId()
     ClearPedTasksImmediately(ped)
-    TriggerEvent("chat:addMessage", { args = {"Tasks cleared"} })
 end
 
 local function ResetVision()
     local ped = PlayerPedId()
     ResetPedVisibleDamage(ped)
     ClearPedBloodDamage(ped)
-    TriggerEvent("chat:addMessage", { args = {"Vision reset"} })
 end
 
 -- Action mapping
@@ -218,14 +194,12 @@ local actions = {
     toggle_punch = TogglePunch,
     toggle_strength = ToggleStrength,
     toggle_throw = ToggleThrow,
-    toggle_friendly = ToggleFriendlyFire,
     toggle_crosshair = ToggleCrosshair,
     set_health = SetHealth,
     set_armor = SetArmor,
     change_model = ChangeModel,
     heal = Heal,
     armor = Armor,
-    revive = Revive,
     suicide = Suicide,
     clear_task = ClearTask,
     reset_vision = ResetVision
@@ -247,12 +221,10 @@ end
 
 -- Draw menu
 local function DrawMenu()
-    -- Background
     DrawRect(0.5, 0.5, 0.4, 0.9, 0, 0, 0, 220)
     DrawRect(0.5, 0.1, 0.4, 0.1, 255, 215, 0, 255) -- Yellow header
     DrawText2D(0.3, 0.05, "~y~Freako", 0.6, 255, 255, 255, 255)
 
-    -- Player Options
     DrawText2D(0.15, 0.15, "~y~Player", 0.4, 255, 255, 0, 255)
     local y = 0.2
     for i, option in ipairs(playerOptions) do
@@ -262,7 +234,6 @@ local function DrawMenu()
         y = y + 0.05
     end
 
-    -- Misc Options
     DrawText2D(0.65, 0.15, "~y~Misc", 0.4, 255, 255, 0, 255)
     y = 0.2
     for i, option in ipairs(miscOptions) do
@@ -287,11 +258,17 @@ CreateThread(function()
         if IsControlJustPressed(0, 166) then -- F5
             menuActive = not menuActive
             if menuActive then
-                currentOption = 1 -- Reset to first option when opening
+                currentOption = 1
             end
         end
 
         if menuActive then
+            local ped = PlayerPedId()
+            if not DoesEntityExist(ped) then
+                menuActive = false
+                return
+            end
+
             DrawMenu()
             DisableAllControlActions(0)
             EnableControlAction(0, 172, true) -- Up
@@ -299,7 +276,7 @@ CreateThread(function()
             EnableControlAction(0, 174, true) -- Left
             EnableControlAction(0, 175, true) -- Right
             EnableControlAction(0, 176, true) -- Enter
-            EnableControlAction(0, 177, true) -- Backspace to close
+            EnableControlAction(0, 177, true) -- Backspace
 
             if IsControlJustPressed(0, 172) then
                 currentOption = currentOption - 1
@@ -324,7 +301,7 @@ CreateThread(function()
                     local opt = miscOptions[currentOption - #playerOptions]
                     actions[opt.action](opt.value)
                 end
-            elseif IsControlJustPressed(0, 177) then -- Backspace to exit
+            elseif IsControlJustPressed(0, 177) then
                 menuActive = false
             end
         end
@@ -377,13 +354,5 @@ CreateThread(function()
                 end
             end
         end
-    end
-end)
-
--- FiveM-specific cleanup on resource stop
-AddEventHandler("onResourceStop", function(resourceName)
-    if GetCurrentResourceName() == resourceName then
-        if freeCamActive then ToggleFreeCam(false) end
-        menuActive = false
     end
 end)
