@@ -222,7 +222,7 @@ end
 -- Draw menu
 local function DrawMenu()
     DrawRect(0.5, 0.5, 0.4, 0.9, 0, 0, 0, 220)
-    DrawRect(0.5, 0.1, 0.4, 0.1, 255, 215, 0, 255) -- Yellow header
+    DrawRect(0.5, 0.1, 0.4, 0.1, 255, 215, 0, 255)
     DrawText2D(0.3, 0.05, "~y~Freako", 0.6, 255, 255, 255, 255)
 
     DrawText2D(0.15, 0.15, "~y~Player", 0.4, 255, 255, 0, 255)
@@ -241,9 +241,9 @@ local function DrawMenu()
         local color = (currentOption == idx) and { 255, 255, 0, 255 } or { 255, 255, 255, 255 }
         if option.action:find("set_") then
             DrawText2D(0.65, y, option.label .. ": " .. option.value, 0.3, color[1], color[2], color[3], color[4])
-            DrawRect(0.75, y + 0.015, 0.15, 0.03, 255, 215, 0, 255) -- Slider background
+            DrawRect(0.75, y + 0.015, 0.15, 0.03, 255, 215, 0, 255)
             local sliderWidth = (option.value - option.min) / (option.max - option.min) * 0.15
-            DrawRect(0.75, y + 0.015, sliderWidth, 0.03, 0, 255, 0, 255) -- Slider fill
+            DrawRect(0.75, y + 0.015, sliderWidth, 0.03, 0, 255, 0, 255)
         else
             DrawText2D(0.65, y, option.label, 0.3, color[1], color[2], color[3], color[4])
         end
