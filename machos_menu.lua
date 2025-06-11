@@ -13,23 +13,24 @@ local crosshair = false
 local healthAmount = 0
 local armorAmount = 0
 local model = nil
+local lastToggle = 0 -- For debounce
 
--- GUI rendering functions (adapted for Macho)
+-- GUI rendering functions
 function drawText(text, x, y, scale, r, g, b, a)
-    DrawText(text, x, y, scale, r, g, b, a) -- Assume Macho provides this
+    pcall(function() DrawText(text, x, y, scale, r, g, b, a) end) -- Error handling
 end
 
 function drawRect(x, y, width, height, r, g, b, a)
-    DrawRect(x, y, width, height, r, g, b, a) -- Assume Macho provides this
+    pcall(function() DrawRect(x, y, width, height, r, g, b, a) end) -- Error handling
 end
 
 function isMouseInBounds(x, y, w, h)
-    local mx, my = GetMousePosition() -- Assume Macho provides mouse position
+    local mx, my = GetMousePosition() or {0, 0} -- Fallback if nil
     return mx >= x and mx <= x + w and my >= y and my <= y + h
 end
 
 function isMouseClicked()
-    return IsControlJustPressed(0, 24) -- Mouse left click (GTA V native)
+    return IsControlJustPressed(0, 24) -- Mouse left click
 end
 
 function toggleOption(label, x, y, state)
@@ -45,7 +46,7 @@ function sliderOption(label, x, y, value, min, max)
     drawRect(x + 0.1, y, 0.08, 0.02, 255, 255, 0, 200)
     local newValue = value
     if isMouseInBounds(x + 0.1, y - 0.01, 0.08, 0.02) and IsControlPressed(0, 24) then
-        local mx = GetMousePosition() / 1920 -- Normalize mouse x
+        local mx = (GetMousePosition() or {x = 0})[1] / 1920
         newValue = (mx - (x + 0.1)) / 0.08 * (max - min)
         newValue = math.max(min, math.min(max, newValue))
     end
@@ -89,9 +90,10 @@ end
 
 -- Main loop
 while true do
-    if IsControlJustPressed(0, 166) then -- F5 key (VK_F5)
+    local currentTime = GetGameTimer()
+    if IsControlJustPressed(0, 166) and (currentTime - lastToggle) > 300 then -- F5 key with 300ms debounce
         menuOpen = not menuOpen
-        Wait(200) -- Debounce
+        lastToggle = currentTime
     end
 
     if menuOpen then
@@ -132,5 +134,5 @@ while true do
         applyStates()
     end
 
-    Wait(0) -- Polling loop
+    Wait(0)
 end
