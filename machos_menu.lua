@@ -286,6 +286,9 @@ CreateThread(function()
         Wait(0)
         if IsControlJustPressed(0, 166) then -- F5
             menuActive = not menuActive
+            if menuActive then
+                currentOption = 1 -- Reset to first option when opening
+            end
         end
 
         if menuActive then
@@ -296,6 +299,7 @@ CreateThread(function()
             EnableControlAction(0, 174, true) -- Left
             EnableControlAction(0, 175, true) -- Right
             EnableControlAction(0, 176, true) -- Enter
+            EnableControlAction(0, 177, true) -- Backspace to close
 
             if IsControlJustPressed(0, 172) then
                 currentOption = currentOption - 1
@@ -320,6 +324,8 @@ CreateThread(function()
                     local opt = miscOptions[currentOption - #playerOptions]
                     actions[opt.action](opt.value)
                 end
+            elseif IsControlJustPressed(0, 177) then -- Backspace to exit
+                menuActive = false
             end
         end
     end
