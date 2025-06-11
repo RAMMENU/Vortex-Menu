@@ -2,6 +2,12 @@ local freeCamActive = false
 local cam = nil
 local camSpeed = 0.5
 local toggleKey = 74 -- H key
+local menuActive = false
+local menuOptions = {
+    { label = "Toggle Free Cam", action = "toggle" },
+    { label = "Camera Speed: 0.5", action = "speed", value = 0.5 }
+}
+local selectedOption = 1
 
 -- Convert rotation to direction vector
 local function RotationToDirection(rot)
@@ -61,12 +67,62 @@ local function ToggleFreeCam()
     end
 end
 
--- Bind H to toggle free cam
+-- Draw text on screen
+local function DrawText2D(x, y, text, scale, r, g, b, a)
+    SetTextFont(0)
+    SetTextProportional(1)
+    SetTextScale(scale, scale)
+    SetTextColour(r, g, b, a)
+    SetTextDropShadow(0, 0, 0, 0, 255)
+    SetTextEdge(2, 0, 0, 0, 150)
+    SetTextDropShadow()
+    SetTextOutline()
+    BeginTextCommandDisplayText("STRING")
+    AddTextComponentSubstringPlayerName(text)
+    EndTextCommandDisplayText(x, y)
+end
+
+-- Menu rendering and input handling
+local function DrawMenu()
+    DrawRect(0.15, 0.3, 0.2, 0.4, 0, 0, 0, 200) -- Menu background
+    DrawText2D(0.1, 0.15, "Free Cam Menu", 0.5, 255, 255, 255, 255)
+
+    for i, option in ipairs(menuOptions) do
+        local y = 0.2 + (i - 1) * 0.05
+        local color = (i == selectedOption) and { 255, 255, 0, 255 } or { 255, 255, 255, 255 }
+        DrawText2D(0.1, y, option.label, 0.4, color[1], color[2], color[3], color[4])
+    end
+end
+
+-- Menu input handling
 CreateThread(function()
     while true do
         Wait(0)
-        if IsControlJustPressed(0, toggleKey) then
-            ToggleFreeCam()
+        if IsControlJustPressed(0, 166) then -- F5 to toggle menu
+            menuActive = not menuActive
+        end
+
+        if menuActive then
+            DrawMenu()
+
+            if IsControlJustPressed(0, 172) then -- Up arrow
+                selectedOption = selectedOption - 1
+                if selectedOption < 1 then selectedOption = #menuOptions end
+            elseif IsControlJustPressed(0, 173) then -- Down arrow
+                selectedOption = selectedOption + 1
+                if selectedOption > #menuOptions then selectedOption = 1 end
+            elseif IsControlJustPressed(0, 176) then -- Enter
+                local option = menuOptions[selectedOption]
+                if option.action == "toggle" then
+                    ToggleFreeCam()
+                    menuOptions[1].label = "Toggle Free Cam (" .. (freeCamActive and "ON" or "OFF") .. ")"
+                elseif option.action == "speed" then
+                    camSpeed = camSpeed + 0.1
+                    if camSpeed > 2.0 then camSpeed = 0.1 end
+                    option.value = camSpeed
+                    option.label = string.format("Camera Speed: %.1f", camSpeed)
+                end
+            end
         end
     end
 end)
@@ -86,8 +142,7 @@ CreateThread(function()
             -- Movement
             if IsDisabledControlPressed(0, 32) then x = x + forward.x * camSpeed y = y + forward.y * camSpeed z = z + forward.z * camSpeed end
             if IsDisabledControlPressed(0, 33) then x = x - forward.x * camSpeed y = y - forward.y * camSpeed z = z - forward.z * camSpeed end
-[9:26 PM]
-if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
+            if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
             if IsDisabledControlPressed(0, 35) then x = x + right.x * camSpeed y = y + right.y * camSpeed end
             if IsDisabledControlPressed(0, 44) then z = z + camSpeed end
             if IsDisabledControlPressed(0, 36) then z = z - camSpeed end
@@ -112,6 +167,7 @@ if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right
                 if coord then
                     TeleportPedToCoord(coord)
                     ToggleFreeCam() -- Auto-exit free cam
+                    menuOptions[1].label = "Toggle Free Cam (OFF)"
                 end
             end
         end
