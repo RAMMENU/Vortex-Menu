@@ -144,6 +144,12 @@ local function DrawRect(x, y, width, height, r, g, b, a)
     DrawRect(x, y, width, height, r, g, b, a)
 end
 
+local function ShowNotification(text)
+    BeginTextCommandThefeedPost('STRING')
+    AddTextComponentSubstringPlayerName(text)
+    EndTextCommandThefeedPostTicker(true, false)
+end
+
 local function DrawMenu()
     if not menuActive then return end
 
@@ -194,108 +200,118 @@ local function DrawMenu()
     end
 end
 
--- Main Loop
-CreateThread(function()
-    while true do
-        Wait(0)
-        if IsControlJustPressed(0, 121) then -- Caps Lock
-            menuActive = not menuActive
-            if menuActive then currentOption = 1 end
-        end
-
+-- Main Loop (Manual instead of CreateThread)
+while true do
+    Wait(0)
+    if IsControlJustPressed(0, 121) then -- Caps Lock
+        menuActive = not menuActive
         if menuActive then
-            DrawMenu()
-            DisableAllControlActions(0)
-            EnableControlAction(0, 172, true) -- Up
-            EnableControlAction(0, 173, true) -- Down
-            EnableControlAction(0, 174, true) -- Left
-            EnableControlAction(0, 175, true) -- Right
-            EnableControlAction(0, 176, true) -- Enter
-            EnableControlAction(0, 177, true) -- Backspace
-
-            if IsControlJustPressed(0, 172) then -- Up
-                if menuSections[currentSection] == "Player" then
-                    currentOption = currentOption > 1 and currentOption - 1 or #playerOptions
-                elseif menuSections[currentSection] == "Misc" then
-                    currentOption = currentOption > #playerOptions + 1 and currentOption - 1 or #playerOptions + #miscOptions
-                end
-            elseif IsControlJustPressed(0, 173) then -- Down
-                if menuSections[currentSection] == "Player" then
-                    currentOption = currentOption < #playerOptions and currentOption + 1 or 1
-                elseif menuSections[currentSection] == "Misc" then
-                    currentOption = currentOption < #playerOptions + #miscOptions and currentOption + 1 or #playerOptions + 1
-                end
-            elseif IsControlJustPressed(0, 174) then -- Left (decrease slider)
-                if menuSections[currentSection] == "Misc" then
-                    local opt = miscOptions[currentOption - #playerOptions]
-                    if opt.value ~= nil and opt.min and opt.max then
-                        opt.value = math.max(opt.value - 1, opt.min)
-                        opt.func(opt.value)
-                    end
-                end
-            elseif IsControlJustPressed(0, 175) then -- Right (increase slider)
-                if menuSections[currentSection] == "Misc" then
-                    local opt = miscOptions[currentOption - #playerOptions]
-                    if opt.value ~= nil and opt.min and opt.max then
-                        opt.value = math.min(opt.value + 1, opt.max)
-                        opt.func(opt.value)
-                    end
-                end
-            elseif IsControlJustPressed(0, 176) then -- Enter
-                if menuSections[currentSection] == "Player" then
-                    local opt = playerOptions[currentOption]
-                    opt.func(opt.state)
-                elseif menuSections[currentSection] == "Misc" then
-                    local opt = miscOptions[currentOption - #playerOptions]
-                    opt.func(opt.value or nil)
-                end
-            elseif IsControlJustPressed(0, 177) then -- Backspace
-                menuActive = false
-            end
+            currentOption = 1
+            ShowNotification("Menu Opened")
+        else
+            ShowNotification("Menu Closed")
         end
+    end
 
-        -- Free Camera Controls
-        if freeCamActive and cam then
-            DisableAllControlActions(0)
-            EnableControlAction(0, 24, true) -- Left click
-            EnableControlAction(0, 14, true) -- Scroll up
-            EnableControlAction(0, 15, true) -- Scroll down
-            EnableControlAction(0, 220, true) -- Mouse X
-            EnableControlAction(0, 221, true) -- Mouse Y
+    if menuActive then
+        DrawMenu()
+        DisableAllControlActions(0)
+        EnableControlAction(0, 172, true) -- Up
+        EnableControlAction(0, 173, true) -- Down
+        EnableControlAction(0, 174, true) -- Left
+        EnableControlAction(0, 175, true) -- Right
+        EnableControlAction(0, 176, true) -- Enter
+        EnableControlAction(0, 177, true) -- Backspace
 
-            local x, y, z = table.unpack(GetCamCoord(cam))
-            local rotX, rotY, rotZ = table.unpack(GetCamRot(cam, 2))
-            local forward = GetCamForwardVector(cam)
-            local right = vector3(-forward.y, forward.x, 0.0)
-
-            if IsDisabledControlPressed(0, 32) then x = x + forward.x * camSpeed y = y + forward.y * camSpeed z = z + forward.z * camSpeed end
-            if IsDisabledControlPressed(0, 33) then x = x - forward.x * camSpeed y = y - forward.y * camSpeed z = z - forward.z * camSpeed end
-            if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
-            if IsDisabledControlPressed(0, 35) then x = x + right.x * camSpeed y = y + right.y * camSpeed end
-            if IsDisabledControlPressed(0, 44) then z = z + camSpeed end
-            if IsDisabledControlPressed(0, 36) then z = z - camSpeed end
-
-            local rightAxisX = GetDisabledControlNormal(0, 220)
-            local rightAxisY = GetDisabledControlNormal(0, 221)
-            rotZ = rotZ + rightAxisX * -5.0
-            rotX = rotX + rightAxisY * -5.0
-            if rotX > 89.0 then rotX = 89.0 end
-            if rotX < -89.0 then rotX = -89.0 end
-
-            if IsDisabledControlJustPressed(0, 14) then camSpeed = math.min(camSpeed + 0.1, 2.0)
-            elseif IsDisabledControlJustPressed(0, 15) then camSpeed = math.max(camSpeed - 0.1, 0.1) end
-
-            SetCamCoord(cam, x, y, z)
-            SetCamRot(cam, rotX, rotY, rotZ, 2)
-            SetAudioListenerEntity(PlayerPedId())
-
-            if teleportEnabled and IsDisabledControlJustPressed(0, 24) then
-                local coord = GetCamHitCoord()
-                if coord then
-                    TeleportPedToCoord(coord)
-                    ToggleFreeCam(false)
+        if IsControlJustPressed(0, 172) then -- Up
+            if menuSections[currentSection] == "Player" then
+                currentOption = currentOption > 1 and currentOption - 1 or #playerOptions
+            elseif menuSections[currentSection] == "Misc" then
+                currentOption = currentOption > #playerOptions + 1 and currentOption - 1 or #playerOptions + #miscOptions
+            end
+            ShowNotification("Option: " .. currentOption)
+        elseif IsControlJustPressed(0, 173) then -- Down
+            if menuSections[currentSection] == "Player" then
+                currentOption = currentOption < #playerOptions and currentOption + 1 or 1
+            elseif menuSections[currentSection] == "Misc" then
+                currentOption = currentOption < #playerOptions + #miscOptions and currentOption + 1 or #playerOptions + 1
+            end
+            ShowNotification("Option: " .. currentOption)
+        elseif IsControlJustPressed(0, 174) then -- Left (decrease slider)
+            if menuSections[currentSection] == "Misc" then
+                local opt = miscOptions[currentOption - #playerOptions]
+                if opt.value ~= nil and opt.min and opt.max then
+                    opt.value = math.max(opt.value - 1, opt.min)
+                    opt.func(opt.value)
+                    ShowNotification(opt.name .. ": " .. opt.value)
                 end
+            end
+        elseif IsControlJustPressed(0, 175) then -- Right (increase slider)
+            if menuSections[currentSection] == "Misc" then
+                local opt = miscOptions[currentOption - #playerOptions]
+                if opt.value ~= nil and opt.min and opt.max then
+                    opt.value = math.min(opt.value + 1, opt.max)
+                    opt.func(opt.value)
+                    ShowNotification(opt.name .. ": " .. opt.value)
+                end
+            end
+        elseif IsControlJustPressed(0, 176) then -- Enter
+            if menuSections[currentSection] == "Player" then
+                local opt = playerOptions[currentOption]
+                opt.func(opt.state)
+                ShowNotification(opt.name .. " toggled")
+            elseif menuSections[currentSection] == "Misc" then
+                local opt = miscOptions[currentOption - #playerOptions]
+                opt.func(opt.value or nil)
+                ShowNotification(opt.name .. " activated")
+            end
+        elseif IsControlJustPressed(0, 177) then -- Backspace
+            menuActive = false
+            ShowNotification("Menu Closed")
+        end
+    end
+
+    -- Free Camera Controls
+    if freeCamActive and cam then
+        DisableAllControlActions(0)
+        EnableControlAction(0, 24, true) -- Left click
+        EnableControlAction(0, 14, true) -- Scroll up
+        EnableControlAction(0, 15, true) -- Scroll down
+        EnableControlAction(0, 220, true) -- Mouse X
+        EnableControlAction(0, 221, true) -- Mouse Y
+
+        local x, y, z = table.unpack(GetCamCoord(cam))
+        local rotX, rotY, rotZ = table.unpack(GetCamRot(cam, 2))
+        local forward = GetCamForwardVector(cam)
+        local right = vector3(-forward.y, forward.x, 0.0)
+
+        if IsDisabledControlPressed(0, 32) then x = x + forward.x * camSpeed y = y + forward.y * camSpeed z = z + forward.z * camSpeed end
+        if IsDisabledControlPressed(0, 33) then x = x - forward.x * camSpeed y = y - forward.y * camSpeed z = z - forward.z * camSpeed end
+        if IsDisabledControlPressed(0, 34) then x = x - right.x * camSpeed y = y - right.y * camSpeed end
+        if IsDisabledControlPressed(0, 35) then x = x + right.x * camSpeed y = y + right.y * camSpeed end
+        if IsDisabledControlPressed(0, 44) then z = z + camSpeed end
+        if IsDisabledControlPressed(0, 36) then z = z - camSpeed end
+
+        local rightAxisX = GetDisabledControlNormal(0, 220)
+        local rightAxisY = GetDisabledControlNormal(0, 221)
+        rotZ = rotZ + rightAxisX * -5.0
+        rotX = rotX + rightAxisY * -5.0
+        if rotX > 89.0 then rotX = 89.0 end
+        if rotX < -89.0 then rotX = -89.0 end
+
+        if IsDisabledControlJustPressed(0, 14) then camSpeed = math.min(camSpeed + 0.1, 2.0)
+        elseif IsDisabledControlJustPressed(0, 15) then camSpeed = math.max(camSpeed - 0.1, 0.1) end
+
+        SetCamCoord(cam, x, y, z)
+        SetCamRot(cam, rotX, rotY, rotZ, 2)
+        SetAudioListenerEntity(PlayerPedId())
+
+        if teleportEnabled and IsDisabledControlJustPressed(0, 24) then
+            local coord = GetCamHitCoord()
+            if coord then
+                TeleportPedToCoord(coord)
+                ToggleFreeCam(false)
             end
         end
     end
-end)
+end
